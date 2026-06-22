@@ -43,8 +43,8 @@ clean merge history. One spine; tributaries optional.
 
 ```bash
 # one-time (collaborator clone — the default)
-git clone https://github.com/naveenpai-dev/can-logger.git
-cd can-logger
+git clone https://github.com/naveenpai-dev/Can-logger-and-tester.git
+cd Can-logger-and-tester
 
 # per change
 git switch -c feat/sd-fatfs-writer
