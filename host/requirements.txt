@@ -1,0 +1,3 @@
+# Live-capture dependency only. --demo mode and the parser/CSV/stats run on the
+# Python standard library alone (no install needed for the no-hardware proof).
+pyserial>=3.5
