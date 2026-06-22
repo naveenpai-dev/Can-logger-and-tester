@@ -1,0 +1,25 @@
+# Build outputs
+build/CPU1_RAM/
+build/CPU1_FLASH/
+build/BSP_RAM/
+build/BSP_FLASH/
+*.obj
+*.out
+*.map
+*.lst
+*.asm.lst
+
+# Host tool artifacts
+__pycache__/
+*.pyc
+*.csv
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Doxygen
+docs/generated/
