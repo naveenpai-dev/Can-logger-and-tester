@@ -17,9 +17,13 @@ host), and build. Nothing reaches outside the tree except those two named toolch
 | Path | What it is | State |
 |---|---|---|
 | `firmware/atelier_can_logger.c` | C28x firmware core — MCAN FD, accept-all, lock-free ring, framed SCI stream. | Reference core — flash-and-iterate (see `firmware/README.md`). |
-| `host/can_logger_host.py` | Laptop logger/monitor — parses the stream, writes CSV, live stats. `--demo` needs no board. | Tested. |
+| `host/can_logger_host.py` | **Logger** — parses the stream, writes CSV, live stats. `--demo` needs no board. | Tested. |
+| `host/uds_tester.py` | **UDS tester** — ISO 14229-1 client over ISO-TP (sessions, DID r/w, DTCs, security). `--demo` runs against a simulated ECU. | Tested. |
 | `tools/canfd_bittiming.py` | CAN-FD bit-timing solver — BRP/TSEG1/TSEG2/SJW per phase for any MCAN clock. | Tested. |
-| `docs/` | Wire protocol, bit-timing reference, bill of materials, roadmap. | — |
+| `docs/` | Wire protocol, bit-timing, BOM, UDS tester design, roadmap. | — |
+
+Two host tools, one board: the logger is the **passive** capture side, the tester the
+**active** diagnostic side. The firmware is a transparent CAN↔serial bridge serving both.
 
 ---
 
@@ -73,9 +77,11 @@ byte-for-byte between `firmware/` and `host/`. Full spec: [`docs/WIRE_PROTOCOL.m
 
 ## Status & roadmap
 
-The **CAN-FD logger** is the delivered half of this snapshot. The **UDS tester** named in
-the repo title, the on-board **SD/FatFS** logging path, and a **Rust + egui** production
-host are the next deliverables — tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Both halves named in the repo title are delivered host-side: the **CAN-FD logger** and the
+**UDS tester** (ISO-TP + UDS, proven against a simulated ECU). Open threads — the on-board
+**SD/FatFS** path, the firmware **SCI→CAN bridge** for live tester use, hardware bit-timing
+verification, and a **Rust + egui** production host — are tracked in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 

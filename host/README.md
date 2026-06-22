@@ -1,4 +1,25 @@
-# host/ — laptop logger & live monitor
+# host/ — laptop tools
+
+Two host-side tools share this folder and the same board:
+
+| Tool | Role | Proof without hardware |
+|---|---|---|
+| `can_logger_host.py` | **passive** — capture the bus to CSV + live monitor | `--demo` |
+| `uds_tester.py` | **active** — UDS (ISO 14229-1) client over ISO-TP | `--demo` (simulated ECU) |
+
+The UDS tester is documented in full at [`../docs/UDS_TESTER.md`](../docs/UDS_TESTER.md);
+the quick version:
+
+```bash
+python uds_tester.py --demo --ecu BMS                  # identify, no hardware
+python uds_tester.py --port COM5 --ecu OBC --read 0xF190
+```
+
+Both tools install the same single dependency (`pyserial`, live mode only).
+
+---
+
+## can_logger_host.py — logger & live monitor
 
 `can_logger_host.py` is the laptop-side companion for the C2000 CAN-FD logger. It reads
 the board's framed stream over USB-serial (the XDS110 virtual COM, or any USB-UART),

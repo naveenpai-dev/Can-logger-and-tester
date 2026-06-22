@@ -1,7 +1,8 @@
 # Roadmap
 
-The delivered half of this snapshot is the **CAN-FD logger** (firmware core + tested host +
-bit-timing solver). The open threads below are carried forward from the design capsule.
+Delivered in this snapshot: the **CAN-FD logger** (firmware core + tested host + bit-timing
+solver) and the **UDS tester** host tool (ISO-TP + UDS client, proven against a simulated
+ECU via `--demo`). The open threads below are carried forward from the design capsule.
 
 ## CAN-FD logger — firmware completion
 
@@ -14,8 +15,14 @@ bit-timing solver). The open threads below are carried forward from the design c
 
 ## UDS tester — the second half of the repo title
 
-- [ ] **UDS request/response tester** — the diagnostic-tester counterpart to the logger
-      (the on-bus active side). Not yet delivered in this snapshot.
+- [x] **UDS request/response tester** (`host/uds_tester.py`) — ISO-TP transport + UDS client
+      (sessions, DID r/w, DTC read/clear, routine control, ECU reset, security access,
+      tester-present), MM Mill address book, NRC decoding, proven against a simulated ECU.
+- [ ] **Firmware SCI→CAN bridge** — the small host→board TX path that lets the tester drive a
+      real bus (documented in `firmware/README.md`; the demo needs no firmware).
+- [ ] **Live-ECU validation** — run the tester against a real MM ECU once the bridge is flashed.
+- [ ] **Extra services** — functional addressing, 0x85 ControlDTCSetting, 0x28 CommunicationControl.
+- [ ] **Real key algorithm** — replace the demo seed→key toy transform with the OEM algorithm.
 
 ## Host — production hardening
 

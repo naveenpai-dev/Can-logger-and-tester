@@ -16,7 +16,7 @@ All multi-byte fields are **little-endian**.
 ```
 
 - **Sync:** `0xAA 0x55` marks a packet start. The host hunts for it and resyncs on garbage.
-- **type:** `0` = FRAME, `1` = STATUS.
+- **type:** `0` = FRAME (board→host), `1` = STATUS (board→host), `2` = TX_FRAME (host→board).
 - **len:** payload length in bytes.
 - **crc8:** CRC-8 (polynomial `0x07`, init `0x00`) computed over `[type, len, payload]` —
   i.e. everything between the sync and the CRC. A bad CRC makes the host skip past the sync
@@ -46,6 +46,25 @@ All multi-byte fields are **little-endian**.
 | 11 | `rec` | u8 | receive error counter |
 | 12 | `rx` | u32 | total frames received since boot |
 | 16 | `err` | u32 | total drops (ring-full) since boot |
+
+## type 2 — TX_FRAME (host → board, one CAN frame to transmit)
+
+The active direction, used by the UDS tester (`host/uds_tester.py`). The host hands the
+board a CAN frame; the firmware bridge transmits it on the bus. Responses return through
+the normal type-0 FRAME stream. The board firmware needs the small SCI→CAN bridge for
+this (the logger core is RX-only) — see `firmware/README.md`.
+
+| Offset | Field | Type | Notes |
+|---|---|---|---|
+| 0 | `id` | u32 | CAN ID to transmit |
+| 4 | `flags` | u8 | `b0` FD · `b1` BRS · `b3` IDE (extended) — same bitfield as FRAME |
+| 5 | `dlen` | u8 | payload byte length (0..64) |
+| 6 | `data` | u8 × `dlen` | frame payload |
+
+The board is thus a transparent bidirectional CAN↔serial bridge: one firmware serves both
+the passive logger and the active tester. All ISO-TP segmentation/reassembly and UDS logic
+live on the host, where they are easy to iterate (and Rust-portable) — the firmware never
+parses UDS.
 
 ## CAN-FD DLC → byte length
 

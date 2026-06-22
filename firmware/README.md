@@ -53,6 +53,25 @@ These are deliberate, documented gaps — not oversights. Tracked in [`../docs/R
   DATA 12/3/3 constants against a known-good node before a real capture.
 - **On-board transceiver part** — confirm the 5 Mbps-class part from the LaunchPad schematic.
 
+## Enabling the UDS tester — the SCI→CAN bridge (small addition)
+
+The committed logger core is **RX-only**. To drive the active UDS tester
+(`host/uds_tester.py`) on a real bus, add a host→board transmit path so the board becomes a
+bidirectional CAN↔serial bridge. This is a deliberately small, documented addition (the
+firmware never parses UDS — all ISO-TP/UDS logic stays on the host):
+
+1. **Parse `TX_FRAME` (type 2) from SCI.** Run the same `AA 55 | type | len | payload | crc8`
+   framing in reverse on the SCIA RX path. Payload: `id(u32) flags(u8) dlen(u8) data[dlen]`
+   (see [`../docs/WIRE_PROTOCOL.md`](../docs/WIRE_PROTOCOL.md)).
+2. **Transmit it.** Fill an `MCAN_TxBufElement` (`id`, `xtd`/`fdf`/`brs` from `flags`, `dlc`
+   from the length→DLC table), `MCAN_writeMsgRam(MCANA_BASE, MCAN_MEM_TYPE_BUF, idx, &tx)`,
+   then `MCAN_txBufAddReq(MCANA_BASE, idx)`.
+3. **Poll SCI RX in the main loop**, alongside the existing ring drain — keep it non-blocking
+   so the RX/logging path is never stalled.
+
+Responses arrive on the bus and flow back out unchanged through the existing type-0 FRAME
+stream, which the tester reads. No other change to the capture pipeline is needed.
+
 ## How it stays up under load
 
 - Hardware **RX FIFO0** (64 deep) absorbs the inbound burst before software runs.
