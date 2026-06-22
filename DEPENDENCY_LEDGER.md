@@ -17,6 +17,22 @@
 | FreeRTOS-Kernel | `git clone https://github.com/FreeRTOS/FreeRTOS-Kernel vendor/FreeRTOS-Kernel` | tag `V11.1.0` | Large; pinned + vendor-on-first-build. The C28x port lives under `portable/`. |
 | TI C2000 CGT (compiler) | TI: Code Composer Studio ≥ 12.1 → `ti-cgt-c2000` | ≥ 22.6.0 (CCS 12.1 floor) | Toolchain, not source — see `build/verify_env.sh`. |
 
+### UDS client transport — decision
+
+The UDS client (`CanLogger_UdsClient.*`) needs an ISO 15765-2 (ISO-TP) transport. Two options were
+weighed:
+
+| Option | Verdict |
+|---|---|
+| Vendor `isotp-c` (lishen2/isotp-c) and adapt its `isotp_user_*` HAL | **Not chosen now.** The library models a full bidirectional link (two `IsoTpLink`s + an internal poll loop) heavier than the tester-only role needs, and the platform's reference `isotp-c/` is presently an **empty submodule** — vendoring it is a separate, larger task. |
+| **Minimal in-tree shim** (`CanLogger_IsoTp.*`) implementing exactly the tester SF/FF/CF/FC framing | **Chosen.** ~250 lines, no submodule, no third state in this ledger, and a clean swap-out point if a fuller stack is later wanted. Scope limits are stated in the file header (classic 8-byte framing; CAN-FD long-frame escape not implemented). |
+
+If `isotp-c` is later vendored to replace the shim, declare it here exactly like FreeRTOS-Kernel:
+
+| Dependency | Fetch | Pin | Why not vendored yet |
+|---|---|---|---|
+| isotp-c (optional — alternative to the in-tree shim) | `git clone https://github.com/lishen2/isotp-c vendor/isotp-c` | commit-pinned at vendoring time | The in-tree `CanLogger_IsoTp.*` shim covers the current tester role; isotp-c is only needed for a full bidirectional ISO-TP link. |
+
 ## Toolchain floor
 
 - **Compiler:** TI CGT C2000 ≥ **22.6.0** (CCS 12.1) — newer 25.x also fine (EABI).

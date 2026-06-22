@@ -57,6 +57,7 @@
 #define INCLUDE_vTaskDelayUntil                 1
 #define INCLUDE_vTaskDelay                      1
 #define INCLUDE_uxTaskGetStackHighWaterMark     1
+#define INCLUDE_xTaskGetCurrentTaskHandle       1   /* UDS client: notify target for RX demux */
 
 /* Map configASSERT to the atelier safe-state (declared in CanLoggerOs_Init.h). */
 extern void CanLoggerOs_SafeState(const char *file, int line);
