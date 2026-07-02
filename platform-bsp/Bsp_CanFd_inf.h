@@ -98,6 +98,22 @@ typedef void (*Bsp_CanFdIsrCbType)(uint8_t channel, const Bsp_CanFdFrameType *fr
 typedef void (*Bsp_CanFdBusOffCbType)(uint8_t channel, Bsp_CanFdErrState_e state);
 
 /*!
+ * @brief Register the RX callback the MCAL invokes (in ISR context) for every received frame.
+ * @details Part of the capture seam: the app hands the MCAL an ISR-safe sink; the MCAL owns the
+ *          controller. Implemented by the device MCAL (e.g. Mcal_C2000_Mcan). Call before start.
+ * @param channel  BSP CAN-FD channel index.
+ * @param cb       app RX callback (interrupt context; must copy the frame, no blocking calls).
+ */
+extern void Bsp_CanFd_EnableRxISR(uint8_t channel, Bsp_CanFdIsrCbType cb);
+
+/*!
+ * @brief Register the bus-off / error-state callback the MCAL invokes on a state change.
+ * @param channel  BSP CAN-FD channel index.
+ * @param cb       app bus-off callback (same ISR-safety constraints as the RX callback).
+ */
+extern void Bsp_CanFd_EnableBusOffISR(uint8_t channel, Bsp_CanFdBusOffCbType cb);
+
+/*!
  * @brief One CAN-FD frame to transmit, handed to the MCAL by an active client (e.g. UDS tester).
  * @details A pure line logger never needs this; an *active* atelier built on the same capture
  *          seam (the UDS client) emits ISO-TP frames through it. The MCAL copies the frame into a

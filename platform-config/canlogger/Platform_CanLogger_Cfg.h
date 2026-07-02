@@ -41,6 +41,14 @@
  * These are the (TSEG-1)/(TSEG-2)/(SJW) *human* values; the MCAL subtracts 1 for the register.
  * RE-VERIFY with host/canfd_bittiming.py for YOUR clock before trusting the bus. */
 #define CANLOGGER_MCAN_CLOCK_HZ         (80000000UL)
+
+/* MCAN functional-clock divider off the device clock tree (SysCtl_setMCANClk).
+ * ⚠ HARDWARE-VERIFY (ROADMAP v0.2, gap CLG-04): the resulting MCAN clock must equal
+ * CANLOGGER_MCAN_CLOCK_HZ for the declared 2M/5M rates to hold — confirm the F280039C clock
+ * tree on silicon (SYSCLK 120 MHz cannot integer-divide to 80 MHz; the source may be a separate
+ * branch). For the internal-loopback PoC-0 the exact rate is immaterial: TX and RX share the
+ * one controller, so any self-consistent timing round-trips. Value = SysCtl_MCANClkDivider enum. */
+#define CANLOGGER_MCAN_CLK_DIV          (0U)   /* SYSCTL_MCANCLK_DIV_1 */
 #define CANLOGGER_BT_NOM_BRP            ((uint16_t) 1U)
 #define CANLOGGER_BT_NOM_TSEG1          ((uint16_t) 31U)
 #define CANLOGGER_BT_NOM_TSEG2          ((uint16_t) 8U)
@@ -144,5 +152,10 @@
 
 /* Depth of the request queue feeding CanLogger_UdsClient_Task (pending tester jobs). */
 #define CANLOGGER_UDS_REQ_QUEUE_DEPTH   ((uint16_t) 8U)
+
+/* Depth of the RX frame queue the drain task feeds the UDS task (CLG-03). Must hold the whole
+ * consecutive-frame burst of the largest response the tester will accept, back-to-back:
+ * ceil(RX_BUF_BYTES / 7) CFs + 1 FF ≈ 38 for a 256-byte response. Sized generously. */
+#define CANLOGGER_UDS_RX_QUEUE_DEPTH    ((uint16_t) 40U)
 
 #endif /* PLATFORM_CANLOGGER_CFG_H */

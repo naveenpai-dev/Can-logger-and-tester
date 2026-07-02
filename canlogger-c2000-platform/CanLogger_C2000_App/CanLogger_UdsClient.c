@@ -51,21 +51,22 @@
 /* ── Task↔drain contract globals ─────────────────────────────────────────────*/
 QueueHandle_t g_hCanLoggerUdsReqQueue = NULL;
 
-static TaskHandle_t        s_udsTask        = NULL;     /* notified by OnCapturedFrame      */
 static CanLogger_UdsSinkCb s_sink           = NULL;     /* parsed-response consumer         */
 
-/* Single-slot RX mailbox: the latest captured response frame. Written by OnCapturedFrame
- * (drain-task context), read by the UDS task after its notification. Both run in task context,
- * and the half-duplex model means at most one writer is relevant per wait window. */
-static volatile Bsp_CanFdFrameType s_rxFrame;
-static volatile bool               s_rxValid = false;
+/* RX frame queue: the drain task posts captured response frames here (in order), the UDS task
+ * drains them (CLG-03). This replaces the former single-slot mailbox + coalescing task-notify:
+ * a multi-frame response arrives as a back-to-back CF burst, and a single slot would be
+ * overwritten by the higher-priority drain task before the UDS task read it, losing consecutive
+ * frames and aborting on a sequence gap. A depth-N queue preserves every frame of one response. */
+static QueueHandle_t        s_udsRxQueue     = NULL;
 
 /* Reassembly buffer + context for an inbound multi-frame response. */
 static uint8_t              s_rxBuf[CANLOGGER_UDS_RX_BUF_BYTES];
 static CanLogger_IsoTp_Rx_t s_rx;
 
-/* Notification value the drain path posts when a response frame arrives. */
-#define UDS_NOTIFY_RX           ((uint32_t) 0x01U)
+/* True while a non-default diagnostic session is held (a successful $10 with a non-default
+ * sub-function). Gates the TesterPresent keep-alive (CLG-02) so an idle tester stays silent. */
+static volatile bool        s_sessionActive = false;
 
 /* ───────────────────────────── lifecycle ───────────────────────────────────*/
 
@@ -74,7 +75,9 @@ void CanLogger_UdsClient_Init(void)
     g_hCanLoggerUdsReqQueue =
         xQueueCreate(CANLOGGER_UDS_REQ_QUEUE_DEPTH, sizeof(CanLogger_UdsReq_t));
     configASSERT(g_hCanLoggerUdsReqQueue != NULL);
-    s_rxValid = false;
+    s_udsRxQueue =
+        xQueueCreate(CANLOGGER_UDS_RX_QUEUE_DEPTH, sizeof(Bsp_CanFdFrameType));
+    configASSERT(s_udsRxQueue != NULL);
     s_sink    = NULL;
 }
 
@@ -228,12 +231,11 @@ bool CanLogger_UdsClient_OnCapturedFrame(const Bsp_CanFdFrameType *frame)
     if (frame->id != CANLOGGER_UDS_RSP_ID) {
         return false;                                  /* not a response to us */
     }
-    /* Copy into the single-slot mailbox and wake the UDS task. The half-duplex model guarantees
-     * the task is waiting for exactly one transaction, so a single slot suffices. */
-    s_rxFrame = *frame;
-    s_rxValid = true;
-    if (s_udsTask != NULL) {
-        (void) xTaskNotify(s_udsTask, UDS_NOTIFY_RX, eSetBits);
+    /* Queue the response frame for the UDS task (drain-task context; non-blocking). If the queue
+     * is full the frame is dropped here — but it was already logged by the caller, so capture is
+     * never lost; only the tester's view of an over-deep response degrades (bounded by the depth). */
+    if (s_udsRxQueue != NULL) {
+        (void) xQueueSend(s_udsRxQueue, frame, 0U);
     }
     return true;
 }
@@ -247,22 +249,14 @@ bool CanLogger_UdsClient_OnCapturedFrame(const Bsp_CanFdFrameType *frame)
 static CanLogger_IsoTp_RxResult_e CanLogger_UdsClient_AwaitFrame(uint16_t timeout_ms,
                                                                  bool *timed_out)
 {
-    uint32_t notify = 0U;
+    Bsp_CanFdFrameType local;
     *timed_out = false;
 
-    if (xTaskNotifyWait(0U, UDS_NOTIFY_RX, &notify, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
+    if (xQueueReceive(s_udsRxQueue, &local, pdMS_TO_TICKS(timeout_ms)) != pdPASS) {
         *timed_out = true;
         return CANLOGGER_ISOTP_RX_IDLE;
     }
-    if (!s_rxValid) {
-        *timed_out = true;
-        return CANLOGGER_ISOTP_RX_IDLE;
-    }
-    s_rxValid = false;
-    {
-        Bsp_CanFdFrameType local = s_rxFrame;          /* snapshot out of the volatile slot */
-        return CanLogger_IsoTp_RxFeed(&s_rx, &local);
-    }
+    return CanLogger_IsoTp_RxFeed(&s_rx, &local);
 }
 
 /*!
@@ -280,10 +274,11 @@ static void CanLogger_UdsClient_Transact(const CanLogger_UdsReq_t *req, CanLogge
     (void) memset(rsp, 0, sizeof(*rsp));
     rsp->req_sid = req->sid;
 
-    /* 1. Build + transmit the request via ISO-TP. */
+    /* 1. Build + transmit the request via ISO-TP. Flush any frames left from a prior
+     *    transaction so this response reassembles from a clean queue (half-duplex model). */
     pdu_len = CanLogger_UdsClient_BuildPdu(req, pdu);
     CanLogger_IsoTp_RxInit(&s_rx, s_rxBuf, (uint16_t) sizeof(s_rxBuf));
-    s_rxValid = false;
+    (void) xQueueReset(s_udsRxQueue);
 
     if (CanLogger_IsoTp_TxStart(BSP_CANFD_CH0, req_id, pdu, pdu_len, &pending) != 0) {
         rsp->result = CANLOGGER_UDS_TP_ERROR;
@@ -364,6 +359,11 @@ static void CanLogger_UdsClient_Transact(const CanLogger_UdsReq_t *req, CanLogge
             if (cls == CANLOGGER_UDS_OK) {
                 uint16_t n = (s_rx.len <= CANLOGGER_UDS_RX_BUF_BYTES)
                              ? s_rx.len : CANLOGGER_UDS_RX_BUF_BYTES;
+                /* Track session state for the keep-alive gate (CLG-02): a positive $10 to a
+                 * non-default session arms the keep-alive; a return to default disarms it. */
+                if (req->sid == CANLOGGER_UDS_SID_DSC) {
+                    s_sessionActive = (req->sub != CANLOGGER_UDS_SESS_DEFAULT);
+                }
                 (void) memcpy(rsp->data, s_rxBuf, n);
                 rsp->len = n;
             }
@@ -380,9 +380,6 @@ void CanLogger_UdsClient_Task(void *pvParameters)
     CanLogger_UdsReq_t req;
     CanLogger_UdsRsp_t rsp;
 
-    /* OnCapturedFrame notifies this handle when a response id arrives on the capture path. */
-    s_udsTask = xTaskGetCurrentTaskHandle();
-
     for (;;) {
         /* Block up to the TesterPresent cadence for the next queued request. A timeout means it is
          * time to emit the keep-alive (non-default sessions die after S3 ≈ 5 s of silence). */
@@ -393,14 +390,21 @@ void CanLogger_UdsClient_Task(void *pvParameters)
                 s_sink(&rsp);
             }
         } else {
-            /* Periodic keep-alive: suppressPosRsp TesterPresent on the functional id. */
-            CanLogger_UdsReq_t tp;
-            (void) memset(&tp, 0, sizeof(tp));
-            tp.sid        = CANLOGGER_UDS_SID_TP;
-            tp.sub        = CANLOGGER_UDS_TP_SUPPRESS;
-            tp.functional = true;
-            CanLogger_UdsClient_Transact(&tp, &rsp);
-            /* suppressPosRsp ⇒ no response expected; result is not delivered to the sink. */
+#if (CANLOGGER_UDS_TP_REQUIRE_SESSION != 0U)
+            /* CLG-02: only keep a session alive if we actually hold one. A bare-armed tester in
+             * the default session has nothing to keep alive and must stay silent on the bus. */
+            if (s_sessionActive)
+#endif
+            {
+                /* Periodic keep-alive: suppressPosRsp TesterPresent on the functional id. */
+                CanLogger_UdsReq_t tp;
+                (void) memset(&tp, 0, sizeof(tp));
+                tp.sid        = CANLOGGER_UDS_SID_TP;
+                tp.sub        = CANLOGGER_UDS_TP_SUPPRESS;
+                tp.functional = true;
+                CanLogger_UdsClient_Transact(&tp, &rsp);
+                /* suppressPosRsp ⇒ no response expected; result is not delivered to the sink. */
+            }
         }
     }
 }
