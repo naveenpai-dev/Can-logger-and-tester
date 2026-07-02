@@ -158,4 +158,25 @@
  * ceil(RX_BUF_BYTES / 7) CFs + 1 FF ≈ 38 for a 256-byte response. Sized generously. */
 #define CANLOGGER_UDS_RX_QUEUE_DEPTH    ((uint16_t) 40U)
 
+/* ── PoC-0 self-test build (on-chip MCAN internal loopback, both roles) ───────
+ * A build that defines CANLOGGER_POC0_BUILD=1 (see build/makefile poc0 target) flips the atelier
+ * into the board-free self-test: internal loopback ON, the UDS tester armed, the on-chip UDS
+ * responder + request driver enabled, and the SD sink OFF (loopback needs no media). The SHIPPING
+ * default (flag absent) leaves every one of these at its passive value — the logger stays a plain
+ * passive monitor. One flag, config owns the derivation; no PoC knobs bleed into the makefile. */
+#if defined(CANLOGGER_POC0_BUILD) && (CANLOGGER_POC0_BUILD != 0U)
+#  undef  CANLOGGER_MCAN_LOOPBACK
+#  define CANLOGGER_MCAN_LOOPBACK        (1U)   /* internal loopback: TX→RX on-chip */
+#  undef  CANLOGGER_UDS_ENABLE
+#  define CANLOGGER_UDS_ENABLE           (1U)   /* arm the tester role for the demo */
+#  undef  CANLOGGER_SD_ENABLE
+#  define CANLOGGER_SD_ENABLE            (0U)   /* no media sink in loopback         */
+#  define CANLOGGER_POC0_ENABLE          (1U)   /* on-chip responder + request driver */
+#else
+#  define CANLOGGER_POC0_ENABLE          (0U)
+#endif
+
+/* Depth of the PoC-0 responder's inbound request queue (drain task → responder task). */
+#define CANLOGGER_POC0_REQ_QUEUE_DEPTH  ((uint16_t) 8U)
+
 #endif /* PLATFORM_CANLOGGER_CFG_H */

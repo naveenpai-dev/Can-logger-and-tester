@@ -39,12 +39,16 @@
 #define CANLOGGEROS_PRIO_DRAIN          (5U)           /* CanLogger_Drain_Task    */
 #define CANLOGGEROS_PRIO_UDS            (4U)           /* CanLogger_UdsClient_Task*/
 #define CANLOGGEROS_PRIO_SD             (3U)           /* CanLogger_Sd_Task       */
+#define CANLOGGEROS_PRIO_POC_RESP       (3U)           /* CanLogger_Poc0_Responder (PoC-0 only) */
+#define CANLOGGEROS_PRIO_POC_DRV        (2U)           /* CanLogger_Poc0_Driver    (PoC-0 only) */
 #define CANLOGGEROS_PRIO_SYSMON         (1U)           /* CanLogger_SysMon_Task   */
 
 /* ── Task stack budgets (WORDS, C28x) ────────────────────────────────────────*/
 #define CANLOGGEROS_STACK_DRAIN         (512U)
 #define CANLOGGEROS_STACK_UDS           (512U)         /* PDU build + ISO-TP reassembly */
 #define CANLOGGEROS_STACK_SD            (512U)
+#define CANLOGGEROS_STACK_POC_RESP      (512U)         /* PoC-0 responder (ISO-TP TX)   */
+#define CANLOGGEROS_STACK_POC_DRV       (256U)         /* PoC-0 request driver          */
 #define CANLOGGEROS_STACK_SYSMON        (128U)
 
 #endif /* PLATFORM_OS_CFG_H */

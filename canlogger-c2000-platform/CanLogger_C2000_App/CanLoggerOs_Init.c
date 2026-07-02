@@ -30,6 +30,9 @@
 #if (CANLOGGER_UDS_ENABLE != 0U)
 #include "CanLogger_UdsClient.h"
 #endif
+#if (CANLOGGER_POC0_ENABLE != 0U)
+#include "CanLogger_Poc0.h"
+#endif
 
 /* heap_4 placed by the app into a named RAMGS section (configAPPLICATION_ALLOCATED_HEAP=1). */
 #pragma DATA_SECTION(ucHeap, ".freertos_heap")
@@ -59,6 +62,20 @@ void CanLoggerOs_Init(void)
     CanLogger_UdsClient_Init();
     if (xTaskCreate(CanLogger_UdsClient_Task, "uds", CANLOGGEROS_STACK_UDS, NULL,
                     CANLOGGEROS_PRIO_UDS, NULL) != pdPASS) {
+        CanLoggerOs_SafeState(__FILE__, __LINE__);
+    }
+#endif
+
+#if (CANLOGGER_POC0_ENABLE != 0U)
+    /* PoC-0 self-test (internal loopback): an on-chip responder answers the tester's requests, and
+     * a driver task issues the request sequence — both roles exercised with no bus or second node. */
+    CanLogger_Poc0_Init();
+    if (xTaskCreate(CanLogger_Poc0_ResponderTask, "poc-resp", CANLOGGEROS_STACK_POC_RESP, NULL,
+                    CANLOGGEROS_PRIO_POC_RESP, NULL) != pdPASS) {
+        CanLoggerOs_SafeState(__FILE__, __LINE__);
+    }
+    if (xTaskCreate(CanLogger_Poc0_DriverTask, "poc-drv", CANLOGGEROS_STACK_POC_DRV, NULL,
+                    CANLOGGEROS_PRIO_POC_DRV, NULL) != pdPASS) {
         CanLoggerOs_SafeState(__FILE__, __LINE__);
     }
 #endif

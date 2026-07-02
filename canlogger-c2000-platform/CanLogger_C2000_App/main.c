@@ -19,6 +19,7 @@
 #include "driverlib.h"
 #include "device.h"
 #include "CanLoggerOs_Init.h"
+#include "Mcal_C2000_Timebase.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -28,6 +29,10 @@ void main(void)
     Device_initGPIO();
     Interrupt_initModule();
     Interrupt_initVectorTable();
+
+    /* Start the shared microsecond timebase (CPUTimer0) before capture — the RX path and the host
+     * STATUS packet both stamp from it. main() owns the device layer, so it passes SYSCLK here. */
+    Mcal_C2000_Timebase_Init(DEVICE_SYSCLK_FREQ);
 
     CanLoggerOs_Init();
 

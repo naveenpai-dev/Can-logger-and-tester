@@ -24,6 +24,9 @@
 #if (CANLOGGER_UDS_ENABLE != 0U)
 #include "CanLogger_UdsClient.h"
 #endif
+#if (CANLOGGER_POC0_ENABLE != 0U)
+#include "CanLogger_Poc0.h"
+#endif
 
 static uint8_t CanLogger_BusLoadPct(uint32_t frames, uint32_t payload_bytes)
 {
@@ -47,6 +50,10 @@ void CanLogger_Drain_Task(void *pvParameters)
              * handed to the tester (it remains logged above). Cheap id compare + a notify; all UDS
              * parsing runs in the UDS task, never here on the hot path. */
             (void) CanLogger_UdsClient_OnCapturedFrame(&frame);
+#endif
+#if (CANLOGGER_POC0_ENABLE != 0U)
+            /* PoC-0 loopback: hand request-id frames to the on-chip responder (also still logged). */
+            (void) CanLogger_Poc0_OnCapturedFrame(&frame);
 #endif
             /* TODO(why): append to the block-aligned SD batch buffer here when CANLOGGER_SD_ENABLE
              *            and the FatFS writer (CanLogger_Sd) land — keep f_write off this hot path. */

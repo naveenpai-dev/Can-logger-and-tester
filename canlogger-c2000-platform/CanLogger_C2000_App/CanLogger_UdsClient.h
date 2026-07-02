@@ -123,18 +123,19 @@ void CanLogger_UdsClient_RegisterSink(CanLogger_UdsSinkCb sink);
 
 /*!
  * @brief UDS client task body — drains the request queue, drives ISO-TP, owns P2/P2* + 0x78 retry.
- * @details For each request: build the PDU, transmit via ISO-TP, then wait (blocked on a task
- *          notification fed by OnCapturedFrame) up to P2; a 0x78 extends the wait to P2* and loops
- *          up to CANLOGGER_UDS_MAX_PENDING times; a $7F (other NRC) or positive response completes
- *          the transaction and fires the sink. Also issues the periodic TesterPresent keep-alive.
+ * @details For each request: build the PDU, transmit via ISO-TP, then wait (blocked on the RX frame
+ *          queue fed by OnCapturedFrame) up to P2; a 0x78 extends the wait to P2* and loops up to
+ *          CANLOGGER_UDS_MAX_PENDING times; a $7F (other NRC) or positive response completes the
+ *          transaction and fires the sink. The periodic TesterPresent keep-alive is gated on an
+ *          active non-default session (CANLOGGER_UDS_TP_REQUIRE_SESSION).
  */
 void CanLogger_UdsClient_Task(void *pvParameters);
 
 /*!
  * @brief Feed a captured frame to the client (drain-task context — NOT ISR).
- * @details Lightweight: if @p frame->id equals the configured response id, it is copied into the
- *          client's single-slot RX mailbox and the UDS task is notified. All parsing happens in the
- *          task. Returns true if the frame was consumed as a UDS response (still also logged).
+ * @details Lightweight: if @p frame->id equals the configured response id, it is posted to the
+ *          client's RX frame queue for the UDS task to reassemble. All parsing happens in the task.
+ *          Returns true if the frame was consumed as a UDS response (still also logged).
  * @param frame  a captured CAN-FD frame from the drain path.
  * @return true if this frame matched the UDS response id.
  */
