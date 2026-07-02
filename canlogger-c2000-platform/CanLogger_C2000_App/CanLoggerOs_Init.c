@@ -27,6 +27,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
+#if (CANLOGGER_UDS_ENABLE != 0U)
+#include "CanLogger_UdsClient.h"
+#endif
 
 /* heap_4 placed by the app into a named RAMGS section (configAPPLICATION_ALLOCATED_HEAP=1). */
 #pragma DATA_SECTION(ucHeap, ".freertos_heap")
@@ -49,6 +52,16 @@ void CanLoggerOs_Init(void)
                     CANLOGGEROS_PRIO_SYSMON, NULL) != pdPASS) {
         CanLoggerOs_SafeState(__FILE__, __LINE__);
     }
+
+#if (CANLOGGER_UDS_ENABLE != 0U)
+    /* Optional tester role: the UDS client task drives diagnostic requests on the captured bus.
+     * Created AFTER its request queue exists; the drain task feeds it captured response frames. */
+    CanLogger_UdsClient_Init();
+    if (xTaskCreate(CanLogger_UdsClient_Task, "uds", CANLOGGEROS_STACK_UDS, NULL,
+                    CANLOGGEROS_PRIO_UDS, NULL) != pdPASS) {
+        CanLoggerOs_SafeState(__FILE__, __LINE__);
+    }
+#endif
 }
 
 void CanLoggerOs_SafeState(const char *file, int line)

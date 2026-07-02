@@ -21,6 +21,9 @@
 #include "CanLogger_HostStream.h"
 #include "Platform_CanLogger_Cfg.h"
 #include "queue.h"
+#if (CANLOGGER_UDS_ENABLE != 0U)
+#include "CanLogger_UdsClient.h"
+#endif
 
 static uint8_t CanLogger_BusLoadPct(uint32_t frames, uint32_t payload_bytes)
 {
@@ -39,6 +42,12 @@ void CanLogger_Drain_Task(void *pvParameters)
         /* Block until the ISR posts a frame; drain in a tight inner loop on bursts. */
         if (xQueueReceive(g_hCanLoggerRxQueue, &frame, portMAX_DELAY) == pdPASS) {
             CanLogger_HostStream_SendFrame(&frame);
+#if (CANLOGGER_UDS_ENABLE != 0U)
+            /* Demux UDS responses off the same capture path: a frame on the response id is also
+             * handed to the tester (it remains logged above). Cheap id compare + a notify; all UDS
+             * parsing runs in the UDS task, never here on the hot path. */
+            (void) CanLogger_UdsClient_OnCapturedFrame(&frame);
+#endif
             /* TODO(why): append to the block-aligned SD batch buffer here when CANLOGGER_SD_ENABLE
              *            and the FatFS writer (CanLogger_Sd) land — keep f_write off this hot path. */
         }

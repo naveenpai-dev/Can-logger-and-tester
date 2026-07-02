@@ -11,8 +11,12 @@
  * @par Roster
  *   | Task                    | Prio (Cfg)              | Trigger        | Job                          |
  *   |-------------------------|-------------------------|----------------|------------------------------|
- *   | CanLogger_Drain_Task    | CANLOGGEROS_PRIO_DRAIN  | RX queue       | queue → host stream (+ SD)   |
- *   | CanLogger_SysMon_Task   | CANLOGGEROS_PRIO_SYSMON | 1000 ms period | STATUS frame, bus-off recover|
+ *   | CanLogger_Drain_Task     | CANLOGGEROS_PRIO_DRAIN  | RX queue       | queue → host stream (+ SD)   |
+ *   | CanLogger_UdsClient_Task | CANLOGGEROS_PRIO_UDS    | request queue  | UDS tester (opt; own module) |
+ *   | CanLogger_SysMon_Task    | CANLOGGEROS_PRIO_SYSMON | 1000 ms period | STATUS frame, bus-off recover|
+ *
+ * @note  CanLogger_UdsClient_Task lives in CanLogger_UdsClient.c (gated by CANLOGGER_UDS_ENABLE),
+ *        not in CanLoggerOs_Tasks.c — it is an optional active-tester role over the same capture.
  *
  * @defgroup CanLogger_Tasks Task Roster
  */

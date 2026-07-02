@@ -97,4 +97,32 @@ typedef void (*Bsp_CanFdIsrCbType)(uint8_t channel, const Bsp_CanFdFrameType *fr
  */
 typedef void (*Bsp_CanFdBusOffCbType)(uint8_t channel, Bsp_CanFdErrState_e state);
 
+/*!
+ * @brief One CAN-FD frame to transmit, handed to the MCAL by an active client (e.g. UDS tester).
+ * @details A pure line logger never needs this; an *active* atelier built on the same capture
+ *          seam (the UDS client) emits ISO-TP frames through it. The MCAL copies the frame into a
+ *          TX buffer/mailbox SYNCHRONOUSLY before returning (cf. C2000 DCAN CAN_sendMessage), so a
+ *          caller may reuse @p data immediately. Reuses the FDF/BRS/IDE flag bits above.
+ */
+typedef struct {
+    uint32_t id;                            /*!< CAN id (right-aligned, std or ext)  */
+    uint8_t  flags;                         /*!< BSP_CANFD_FLAG_* bitmask            */
+    uint8_t  dlen;                          /*!< payload length to send (0..64)      */
+    uint8_t  chan;                          /*!< BSP_CANFD_CH* to transmit on        */
+    uint8_t  data[64];                      /*!< payload, first @c dlen bytes sent   */
+} Bsp_CanFdTxFrameType;
+
+/*!
+ * @brief Transmit one CAN-FD frame (blocking only on mailbox availability, never on the bus).
+ * @details Provided by the MCAL CAN-FD layer; declared on the seam so an active client links
+ *          against the portable contract, not a chip header. MUST copy @p frame into controller
+ *          storage before returning (synchronous TX), so the caller can immediately overwrite its
+ *          staging buffer (the deterministic compute-ahead TX discipline). NOT callable from ISR
+ *          context — the UDS client task owns all transmission.
+ * @param channel  BSP CAN-FD channel index (e.g. BSP_CANFD_CH0).
+ * @param frame    Frame to transmit; consumed by the call, may be reused afterwards.
+ * @return 0 on success (queued to a TX mailbox); non-zero if no mailbox was free.
+ */
+extern int Bsp_CanFd_Transmit(uint8_t channel, const Bsp_CanFdTxFrameType *frame);
+
 #endif /* BSP_CANFD_INF_H */
