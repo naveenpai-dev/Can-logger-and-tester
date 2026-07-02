@@ -54,6 +54,14 @@
  * REQUIRED above ~2 Mbps to tolerate transceiver loop delay. */
 #define CANLOGGER_MCAN_TDC_ENABLE       (1U)
 
+/* ── MCAN operating mode ──────────────────────────────────────────────────────
+ * 0 = NORMAL (drives the real bus through the on-board transceiver).
+ * 1 = INTERNAL loopback — the protocol controller routes TX→RX on-chip, no bus,
+ *     no transceiver, no external wiring. This is the PoC-0 self-test mode: it lets
+ *     the whole capture + tester path be exercised on a bare LaunchPad. A shipping
+ *     logger MUST build with 0; the PoC config overrides this to 1. */
+#define CANLOGGER_MCAN_LOOPBACK         (0U)
+
 /* ── Capture sizing ──────────────────────────────────────────────────────────
  * Ring depth (power of two) sized for a burst at full bus load. The RX queue between
  * the ISR and the drain task is the platform-layer mirror of this ring. */
@@ -75,8 +83,19 @@
  * When enabled, CanLogger_UdsClient_Task can issue diagnostic requests on the captured
  * bus and parse responses. The logger remains a true line monitor: UDS RX is demultiplexed
  * off the same accept-all capture path (CanLogger_UdsClient_OnCapturedFrame), so capture is
- * never disturbed. Set the IDs to the target ECU's diagnostic addresses before use. */
-#define CANLOGGER_UDS_ENABLE            (1U)
+ * never disturbed. Set the IDs to the target ECU's diagnostic addresses before use.
+ *
+ * DEFAULT 0 (CLG-02): a logger is a PASSIVE monitor by contract — it must not transmit on
+ * the bus it is watching unless the tester role is DELIBERATELY armed. Enabling this makes
+ * the atelier an active node (it sends requests + a periodic TesterPresent). Arm it per
+ * bench, never by default, and never on a production/field bus you only mean to observe. */
+#define CANLOGGER_UDS_ENABLE            (0U)
+
+/* Gate the periodic TesterPresent keep-alive on an ACTIVE non-default session (CLG-02).
+ * 1 = the client sends $3E only after a successful $10 (extended/programming) session and
+ *     stops when it falls back to default — so a bare-armed tester stays silent until it has
+ *     a reason to keep a session alive. 0 = legacy unconditional 2 s broadcast (not advised).*/
+#define CANLOGGER_UDS_TP_REQUIRE_SESSION (1U)
 
 /* Diagnostic addressing (ISO 14229-2 / ISO 15765-2). REQ_ID = tester→ECU (physical request),
  * RSP_ID = ECU→tester (response). Defaults below mirror the platform DTU pair (0x7A0/0x7A8);
